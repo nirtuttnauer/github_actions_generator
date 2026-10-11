@@ -4,6 +4,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QMainWindow, QSplitter, QFileDialog, QMessageBox
 )
+from YamlEditor.preset_validation import validate_preset
 from YamlEditor.job_editor_widget import JobEditorWidget
 from YamlEditor.job_list_widget import JobListWidget
 from YamlEditor.preset_manager_widget import PresetManagerWidget
@@ -131,16 +132,13 @@ class GitHubActionsEditor(QMainWindow):
             self, "Open Preset File", "", "YAML Files (*.yaml *.yml)"
         )
         if file_name:
-            with open(file_name, "r") as file:
-                data = yaml.safe_load(file) or {}
-            preset_name = data.get("name", "UnnamedPreset")
-            raw_jobs = data.get("jobs", [])
-            jobs = []
-            for j in raw_jobs:
-                if isinstance(j, dict):
-                    jobs.append(j)
-                elif isinstance(j, str):
-                    jobs.append({"name": j, "runs-on": ""})
+            try:
+                with open(file_name, "r", encoding="utf-8") as file:
+                    preset_name, jobs = validate_preset(yaml.safe_load(file))
+            except (OSError, UnicodeError, yaml.YAMLError, ValueError) as error:
+                QMessageBox.warning(self, "Load Error", f"Could not load preset:\n{error}")
+                return
+            preset_name = self._get_unique_preset_name(preset_name)
             self.presets[preset_name] = jobs
             self.preset_manager.refresh_list(self.presets.keys())
             self.preset_manager.set_current_preset(preset_name)
@@ -259,8 +257,8 @@ class GitHubActionsEditor(QMainWindow):
                 "jobs": self.presets[self.current_preset]
             }
             try:
-                with open(file_name, "w") as f:
-                    yaml.dump(
+                with open(file_name, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(
                         data, f,
                         default_flow_style=False,
                         sort_keys=False,
