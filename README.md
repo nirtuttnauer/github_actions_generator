@@ -42,7 +42,11 @@ working display and the platform libraries needed by PyQt5.
 
 Save each preset before closing; there is no automatic persistence or unsaved
 changes prompt. Deleting a preset removes it from memory, not from disk.
-Only load trusted preset files; malformed input is not fully validated.
+Malformed YAML, invalid preset fields, and unreadable files show a load error
+without changing your existing presets. Loading a duplicate name creates a new
+preset with a numeric suffix rather than replacing unsaved work. Steps must be
+a list of mappings and environment variables a mapping with text keys. These
+checks validate the editor format, not the full GitHub Actions schema.
 
 ## Preset format and limitations
 
@@ -68,12 +72,17 @@ publish workflows to GitHub.
 
 ## Development
 
-Runtime dependencies are listed in `requirements.txt`. There is currently no
-automated test suite. A syntax-only check (not a GUI or behavior test) is:
+Runtime dependencies are listed in `requirements.txt`. Run the headless Qt
+regression suite and syntax check from the repository root:
 
 ```sh
-python -m compileall -q main.py YamlEditor
+QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -v
+python -m compileall -q main.py YamlEditor tests
 ```
+
+Tests cover valid preset round trips, legacy string jobs, duplicate names,
+malformed and unreadable files, and job edits. GitHub Actions runs these checks
+on Linux with Python 3.10 and 3.12. Headless tests do not assess visual layout.
 
 Python bytecode, local virtual environments, and editor/OS artifacts are ignored
 by Git.

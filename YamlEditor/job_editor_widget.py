@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QLineEdit, QGroupBox, QFormLayout, QComboBox, QPlainTextEdit, QMessageBox
 )
 import yaml
+from YamlEditor.preset_validation import validate_job
 
 # ----------------------------------------------------------------------
 # JobEditorWidget
@@ -29,11 +30,11 @@ class JobEditorWidget(QGroupBox):
         ])
         self.job_steps_edit = QPlainTextEdit()
         self.job_steps_edit.setPlaceholderText(
-            "steps:\n  - name: Checkout code\n    uses: actions/checkout@v2"
+            "- name: Checkout code\n  uses: actions/checkout@v4"
         )
         self.job_env_edit = QPlainTextEdit()
         self.job_env_edit.setPlaceholderText(
-            "env:\n  FOO: bar\n  BAZ: 123"
+            "FOO: bar\nBAZ: 123"
         )
 
         self.btn_save_job = QPushButton("Save Changes")
@@ -101,6 +102,7 @@ class JobEditorWidget(QGroupBox):
                 steps_data = yaml.safe_load(steps_yaml)
             except yaml.YAMLError as e:
                 QMessageBox.warning(self, "YAML Error", f"Error parsing steps:\n{e}")
+                self.job_steps_edit.setFocus()
                 return
 
         # Env
@@ -109,11 +111,9 @@ class JobEditorWidget(QGroupBox):
         if env_yaml:
             try:
                 env_data = yaml.safe_load(env_yaml)
-                if not isinstance(env_data, dict):
-                    QMessageBox.warning(self, "YAML Error", "Env must be a YAML dictionary.")
-                    return
             except yaml.YAMLError as e:
                 QMessageBox.warning(self, "YAML Error", f"Error parsing env:\n{e}")
+                self.job_env_edit.setFocus()
                 return
 
         updated_job = {
@@ -122,6 +122,13 @@ class JobEditorWidget(QGroupBox):
             "steps": steps_data,
             "env": env_data
         }
+        try:
+            updated_job = validate_job(updated_job)
+        except ValueError as error:
+            QMessageBox.warning(self, "YAML Error", str(error))
+            field = self.job_steps_edit if str(error).startswith("Steps") else self.job_env_edit
+            field.setFocus()
+            return
         # We can store the index if needed, or just send the dict
         updated_job["__index__"] = self._current_job_index
 
